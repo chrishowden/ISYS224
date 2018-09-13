@@ -3,7 +3,6 @@
 
 
 /* Question 4-DML Scripts */
-
 -- -----------------------------------------------------
 -- Table `45183228`.`Branch`
 -- -----------------------------------------------------
@@ -36,16 +35,16 @@ INSERT INTO Account_Type VALUES ('CHEQ', 'Cheque', 'Cheque account pays no inter
 -- -----------------------------------------------------
 -- Table `45183228`.`Account`
 -- -----------------------------------------------------
-INSERT INTO Account VALUES ('111222', '0001', '500', '2017-08-02', '', 'STUD');
-INSERT INTO Account VALUES ('222333', '0002', '10000', '2015-06-22', '', 'SAVE');
-INSERT INTO Account VALUES ('111222', '0003', '8000', '2018-01-15', '', 'SAVE');
+INSERT INTO Account VALUES ('111222', '0001', '500', '2017-08-02', NULL, 'STUD');
+INSERT INTO Account VALUES ('222333', '0002', '10000', '2015-06-22', NULL, 'SAVE');
+INSERT INTO Account VALUES ('111222', '0003', '8000', '2018-01-15', NULL, 'SAVE');
 
 -- -----------------------------------------------------
 -- Table `45183228`.`ATM`
 -- -----------------------------------------------------
 INSERT INTO ATM VALUES ('ATM001', 'Gosford Branch', '8:00:00', '18:00:00', '15000', 'B001');
 INSERT INTO ATM VALUES ('ATM002', 'Hornsby Branch', '8:00:00', '18:00:00', '15000', 'B002');
-INSERT INTO ATM VALUES ('ATM003', 'Erina Fair', '9:00:00', '16:00:00', '10000', '');
+INSERT INTO ATM VALUES ('ATM003', 'Erina Fair', '9:00:00', '16:00:00', '10000', NULL);
 
 -- -----------------------------------------------------
 -- Table `45183228`.`Department` EXTRA COL NAME, SHOULDN'T BE HERE
@@ -121,10 +120,34 @@ INSERT INTO Customer_Account VALUES ('C004', '111222', '0003', '000002');
 -- -----------------------------------------------------
 -- Table `45183228`.`Manage`
 -- -----------------------------------------------------
-INSERT INTO Manage VALUES ('E003', 'B001', 'D002', '2015-02-07', '');
-INSERT INTO Manage VALUES ('E004', 'B001', 'D001', '2015-02-27', '');
-INSERT INTO Manage VALUES ('E005', 'B002', 'D003', '2016-06-09', '');
-INSERT INTO Manage VALUES ('E006', 'B002', 'D005', '2016-06-13', '');
-INSERT INTO Manage VALUES ('E007', 'B003', 'D004', '2017-08-07', '');
+INSERT INTO Manage VALUES ('E003', 'B001', 'D002', '2015-02-07', NULL);
+INSERT INTO Manage VALUES ('E004', 'B001', 'D001', '2015-02-27', NULL);
+INSERT INTO Manage VALUES ('E005', 'B002', 'D003', '2016-06-09', NULL);
+INSERT INTO Manage VALUES ('E006', 'B002', 'D005', '2016-06-13', NULL);
+INSERT INTO Manage VALUES ('E007', 'B003', 'D004', '2017-08-07', NULL);
 
 /* Question 5-DQL Scripts */
+SELECT COUNT(*) AS Number_of_Joint_Accounts
+FROM Customer_Account
+GROUP BY accountNumber, BSB
+HAVING COUNT(accountNumber) > 1
+AND COUNT(BSB) > 1;
+
+SELECT *
+-- Account_BSB, Account_accountNumber
+FROM Loan L, Loan_Type LT
+WHERE L.loanType = LT.loanType
+AND LT.name = 'Personal';
+
+SELECT M.branchID, D.name AS DepartmentName, E.name AS ManagerName
+FROM Manage M, Department D, Employee E
+WHERE M.employeeID = E.employeeID
+AND M.departmentID = D.departmentID
+GROUP BY M.departmentID;
+
+SELECT E.name AS ManagerName, E.position, E.salary
+FROM Manage M, Employee E
+WHERE M.employeeID = E.employeeID
+AND E.salary > (SELECT AVG(salary)
+				FROM Manage M, Employee E
+                WHERE M.employeeID = E.employeeID);
