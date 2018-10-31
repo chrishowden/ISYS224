@@ -96,23 +96,64 @@ CREATE TRIGGER cust_loan_insert
     FOR EACH ROW
 BEGIN
 	DECLARE cus_loan_count INT(2);
+	DECLARE loan_type INT(10);
 	-- Customer cannot have individually more than 5 loans
 		SELECT COUNT(LoanID) INTO cus_loan_count
-			FROM T_Own AS O, T_Account AS A, T_Loan AS L
-			WHERE L.Loan_AcctNo = A.AccountNo
-			AND L.Loan_AccountBSB = A.BSB
-			AND O.Account_No = A.AccountNo
-			AND O.Account_BSB = A.BSB
-            AND O.Customer_ID = NEW.Customer_ID
-            GROUP BY Customer_ID;
+		FROM T_Own AS O, T_Account AS A, T_Loan AS L
+		WHERE L.Loan_AcctNo = A.AccountNo
+		AND L.Loan_AccountBSB = A.BSB
+		AND O.Account_No = A.AccountNo
+		AND O.Account_BSB = A.BSB
+    AND O.Customer_ID = NEW.Customer_ID
+    GROUP BY Customer_ID;
 
-    -- Max loans is 8 for customer
+    -- Max loans is 8 for customer IS THIS THE SAME THING?
+		SELECT COUNT(LoanID) INTO cus_loan_count
+		FROM T_Own AS O, T_Account AS A, T_Loan AS L
+		WHERE L.Loan_AcctNo = A.AccountNo
+		AND L.Loan_AccountBSB = A.BSB
+		AND O.Account_No = A.AccountNo
+		AND O.Account_BSB = A.BSB
+    AND O.Customer_ID = NEW.Customer_ID
+    GROUP BY Customer_ID;
 
     -- Max personal loans is 1 for customer
+		SELECT COUNT(Loan_Type) INTO personal_loan_count
+		FROM T_Own AS O, T_Account AS A, T_Loan AS L
+		WHERE L.Loan_AcctNo = A.AccountNo
+		AND L.Loan_AccountBSB = A.BSB
+		AND O.Account_No = A.AccountNo
+		AND O.Account_BSB = A.BSB
+		AND O.Customer_ID = NEW.Customer_ID
+		AND L.Loan_Type = 'LT3'
+		GROUP BY Customer_ID;
 
     -- Max total original loan amount for customer must not exceed 10 MIL!
+		SELECT SUM(LoanAmount) From T_Loan WHERE (SELECT T_Loan.LoanAmount AS loantotal
+																						FROM T_Own
+																						WHERE T_Loan.Loan_AcctNo = T_Own.AccountNo
+																						AND CustomerID = NEW.CustomerID)) >99999999);
+    -- My way of finidning answer
+		SELECT SUM(L.LoanAmount) INTO loan_total
+		FROM T_Own AS O, T_Loan AS L
+		WHERE L.Loan_AcctNo = O.Account_No
+    AND L.Loan_AccountBSB = O.Account_BSB
+		AND Customer_ID = 'C1';
 
     -- Customer cannot have more than 3 home loans
+		SELECT COUNT(Loan_Type) From T_Loan WHERE (SELECT T_Loan.Loan_Type AS loan
+																							FROM T_Own
+																							WHERE T_Loan.Loan_AcctNo = T_Own.AccountNo
+																							AND CustomerID = NEW.CustomerID)) LIKE 'LT1');
+    --My way of finidning answer
+		SELECT COUNT(L.Loan_Type)
+		FROM T_Own AS O, T_Loan AS L
+		WHERE L.Loan_AcctNo = O.Account_No
+		AND L.Loan_AccountBSB = O.Account_BSB
+		AND CustomerID = 'C1'
+		AND LIKE 'LT1';
+
+
 END
 //
 DELIMITER ;
