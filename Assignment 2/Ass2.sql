@@ -107,7 +107,9 @@ BEGIN
     AND O.Customer_ID = NEW.Customer_ID
     GROUP BY Customer_ID;
 
-    -- Max loans is 8 for customer IS THIS THE SAME THING?
+
+
+    -- Max loans is 8 for customer
 		SELECT COUNT(LoanID) INTO cus_loan_count
 		FROM T_Own AS O, T_Account AS A, T_Loan AS L
 		WHERE L.Loan_AcctNo = A.AccountNo
@@ -116,6 +118,14 @@ BEGIN
 		AND O.Account_BSB = A.BSB
     AND O.Customer_ID = NEW.Customer_ID
     GROUP BY Customer_ID;
+
+		-- Also works
+		SELECT COUNT(LoanID) INTO cus_loan_count
+		FROM T_Own AS O, T_Loan AS L
+		WHERE L.Loan_AcctNo = O.Account_No
+		AND L.Loan_AccountBSB = O.Account_BSB
+		AND O.Customer_ID = NEW.Customer_ID
+		GROUP BY Customer_ID;
 
     -- Max personal loans is 1 for customer
 		SELECT COUNT(Loan_Type) INTO personal_loan_count
@@ -128,17 +138,26 @@ BEGIN
 		AND L.Loan_Type = 'LT3'
 		GROUP BY Customer_ID;
 
+		-- This also works
+		SELECT COUNT(Loan_Type) INTO personal_loan_count
+		FROM T_Own AS O, T_Loan AS L
+		WHERE L.Loan_AcctNo = O.Account_No
+		AND L.Loan_AccountBSB = O.Account_BSB
+		AND O.Customer_ID = NEW.Customer_ID
+		AND L.Loan_Type = 'LT3'
+		GROUP BY Customer_ID;
+
     -- Max total original loan amount for customer must not exceed 10 MIL!
 		SELECT SUM(LoanAmount) From T_Loan WHERE (SELECT T_Loan.LoanAmount AS loantotal
 																						FROM T_Own
 																						WHERE T_Loan.Loan_AcctNo = T_Own.AccountNo
 																						AND CustomerID = NEW.CustomerID)) >99999999);
-    -- My way of finidning answer
+    -- My way of finding answer
 		SELECT SUM(L.LoanAmount) INTO loan_total
 		FROM T_Own AS O, T_Loan AS L
 		WHERE L.Loan_AcctNo = O.Account_No
     AND L.Loan_AccountBSB = O.Account_BSB
-		AND Customer_ID = 'C1';
+		AND Customer_ID = NEW.Customer_ID;
 
     -- Customer cannot have more than 3 home loans
 		SELECT COUNT(Loan_Type) From T_Loan WHERE (SELECT T_Loan.Loan_Type AS loan
@@ -150,10 +169,159 @@ BEGIN
 		FROM T_Own AS O, T_Loan AS L
 		WHERE L.Loan_AcctNo = O.Account_No
 		AND L.Loan_AccountBSB = O.Account_BSB
-		AND CustomerID = 'C1'
-		AND LIKE 'LT1';
+		AND Customer_ID = NEW.Customer_ID
+		AND L.Loan_Type = 'LT1';
 
 
 END
 //
 DELIMITER ;
+
+
+-- Rough Working
+SELECT COUNT(count) AS Count_of_count
+	FROM
+	(
+			SELECT L.*, COUNT(Customer_ID) AS count
+			FROM T_Own AS O, T_Loan AS L
+			WHERE L.Loan_AcctNo = O.Account_No
+			AND L.Loan_AccountBSB = O.Account_BSB
+			GROUP BY LoanID
+			HAVING count = 1
+	) AS A;
+
+
+	SELECT *, COUNT(A.Customer_ID) AS count
+			FROM
+			(
+		SELECT LoanID, Customer_ID
+		FROM T_Own AS O, T_Loan AS L
+		WHERE L.Loan_AcctNo = O.Account_No
+		AND L.Loan_AccountBSB = O.Account_BSB
+	) AS A
+			WHERE Customer_ID = 'C1'
+			GROUP BY LoanID
+			HAVING count = 1;
+
+
+			SELECT O1.Customer_ID, COUNT(*) as count
+			FROM T_Own AS O1, T_Loan AS L1
+			WHERE L1.Loan_AcctNo = O1.Account_No
+			AND L1.Loan_AccountBSB = O1.Account_BSB
+	        -- AND O1.Customer_ID = 'C1'
+	        AND 1 <= (SELECT COUNT(Customer_ID) AS count
+					FROM T_Own AS O2, T_Loan AS L2
+					WHERE L2.Loan_AcctNo = O2.Account_No
+					AND L2.Loan_AccountBSB = O2.Account_BSB
+	                AND L2.Loan_AcctNo = L1.Loan_AcctNo
+				    AND L2.Loan_AccountBSB = L1.Loan_AccountBSB
+					GROUP BY L2.LoanID)
+			GROUP BY O1.Customer_ID
+	        HAVING count > 1;
+
+
+
+
+
+
+
+					-- Task 3
+					DELIMITER //
+					DROP TRIGGER IF EXISTS cust_loan_insert //
+					CREATE TRIGGER cust_loan_insert
+						BEFORE INSERT ON T_Own
+						FOR EACH ROW
+					BEGIN
+						DECLARE cus_loan_count INT(2);
+						DECLARE personal_loan_count INT(2);
+						DECLARE loan_type INT(10);
+						DECLARE loan_total INT(2);
+						DECLARE home_loan_count INT(2);
+					    DECLARE message VARCHAR(100);
+
+						DECLARE loan_error CONDITION FOR SQLSTATE '45000';
+					    -- DECLARE EXIT HANDLER FOR loan_error SET MESSAGE_TEXT = message;
+
+						-- DECLARE loan_error2 CONDITION FOR SQLSTATE '45000';
+					    -- DECLARE EXIT HANDLER FOR loan_error2 SET MESSAGE_TEXT = message;
+
+
+
+						-- Customer cannot have individually more than 5 loans
+
+						-- Max loans is 8 for customer
+							-- SELECT COUNT(LoanID) INTO cus_loan_count
+							-- FROM T_Own AS O, T_Loan AS L
+							-- WHERE L.Loan_AcctNo = O.Account_No
+							-- AND L.Loan_AccountBSB = O.Account_BSB
+							-- AND O.Customer_ID = NEW.Customer_ID
+							-- GROUP BY Customer_ID;
+
+							-- IF(cus_loan_count >= 8) THEN
+							-- SET message = 'Maxmimum number of loans reached for customer';
+					        -- SIGNAL loan_error;
+							-- END IF;
+
+						-- Max personal loans is 1 for customer
+							SELECT COUNT(Loan_Type) INTO personal_loan_count
+							FROM T_Own AS O, T_Loan AS L
+							WHERE L.Loan_AcctNo = O.Account_No
+							AND L.Loan_AccountBSB = O.Account_BSB
+							AND O.Customer_ID = NEW.Customer_ID
+							AND L.Loan_Type = 'LT3';
+							-- GROUP BY Customer_ID;
+							IF(personal_loan_count >= 1) THEN
+							SIGNAL loan_error
+							SET MESSAGE_TEXT = 'Maxmimum number of personal loans reached for customer';
+							END IF;
+
+						-- Max total original loan amount for customer must not exceed 10 MIL!
+							SELECT SUM(L.LoanAmount) INTO loan_total
+							FROM T_Own AS O, T_Loan AS L
+							WHERE L.Loan_AcctNo = O.Account_No
+							AND L.Loan_AccountBSB = O.Account_BSB
+							AND Customer_ID = NEW.Customer_ID;
+
+						-- Customer cannot have more than 3 home loans
+							SELECT COUNT(L.Loan_Type) INTO home_loan_count
+							FROM T_Own AS O, T_Loan AS L
+							WHERE L.Loan_AcctNo = O.Account_No
+							AND L.Loan_AccountBSB = O.Account_BSB
+							AND Customer_ID = NEW.Customer_ID
+							AND L.Loan_Type = 'LT1';
+
+
+					END
+					//
+					DELIMITER ;
+
+					INSERT INTO T_Account VALUES ('BSB10','Acct10','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct11','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct12','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct13','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct14','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct15','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct16','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct17','10.00','AT3');
+					INSERT INTO T_Account VALUES ('BSB10','Acct18','10.00','AT3');
+
+					INSERT INTO T_Loan VALUES ('L10','0.05','5000.00','LT3','BSB10','Acct10');
+					INSERT INTO T_Loan VALUES ('L11','0.05','5000.00','LT3','BSB10','Acct11');
+					INSERT INTO T_Loan VALUES ('L12','0.05','5000.00','LT3','BSB10','Acct12');
+					INSERT INTO T_Loan VALUES ('L13','0.05','5000.00','LT3','BSB10','Acct13');
+					INSERT INTO T_Loan VALUES ('L14','0.05','5000.00','LT3','BSB10','Acct14');
+					INSERT INTO T_Loan VALUES ('L15','0.05','5000.00','LT3','BSB10','Acct15');
+					INSERT INTO T_Loan VALUES ('L16','0.05','5000.00','LT3','BSB10','Acct16');
+					INSERT INTO T_Loan VALUES ('L17','0.05','5000.00','LT3','BSB10','Acct17');
+					INSERT INTO T_Loan VALUES ('L18','0.05','5000.00','LT3','BSB10','Acct18');
+
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct10');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct11');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct12');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct13');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct14');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct15');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct16');
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct17');
+
+					INSERT INTO T_Own VALUES ('C1','BSB10','Acct18');
